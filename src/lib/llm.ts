@@ -13,25 +13,23 @@ export interface QueryResult {
   sources: SourceChunk[];
 }
 
-const GCP_CONFIG_PATH = './gcp.json';
 const MODEL_NAME = 'gemini-2.5-flash';
 
-interface GCPConfig {
-  project_id: string;
-  client_email: string;
-  private_key: string;
-}
-
 async function getAccessToken(): Promise<{ token: string; projectId: string }> {
-  const fs = await import('fs');
   const { GoogleAuth } = await import('google-auth-library');
 
-  const gcpConfig: GCPConfig = JSON.parse(fs.readFileSync(GCP_CONFIG_PATH, 'utf8'));
+  const projectId = process.env.GCP_PROJECT_ID;
+  const clientEmail = process.env.GCP_CLIENT_EMAIL;
+  const privateKey = process.env.GCP_PRIVATE_KEY;
+
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error('Missing GCP credentials. Please set GCP_PROJECT_ID, GCP_CLIENT_EMAIL, and GCP_PRIVATE_KEY environment variables.');
+  }
 
   const auth = new GoogleAuth({
     credentials: {
-      client_email: gcpConfig.client_email,
-      private_key: gcpConfig.private_key,
+      client_email: clientEmail,
+      private_key: privateKey,
     },
     scopes: ['https://www.googleapis.com/auth/cloud-platform'],
   });
@@ -40,7 +38,7 @@ async function getAccessToken(): Promise<{ token: string; projectId: string }> {
   if (!token) {
     throw new Error('Failed to obtain access token');
   }
-  return { token, projectId: gcpConfig.project_id };
+  return { token, projectId };
 }
 
 export async function generateAnswer(
