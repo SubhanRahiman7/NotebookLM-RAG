@@ -1,28 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { Document } from '@langchain/core/documents';
+import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const ALLOWED_TYPES = ['application/pdf', 'text/plain'];
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
-
-interface ParsedPDF {
-  text: string;
-  numPages: number;
-  metadata: Record<string, unknown>;
-}
-
-async function parsePDF(buffer: Buffer): Promise<ParsedPDF> {
-  const pdfParse = await import('pdf-parse');
-  const data = await pdfParse.default(buffer);
-  return {
-    text: data.text,
-    numPages: data.numpages,
-    metadata: (data.metadata as Record<string, unknown>) || {},
-  };
-}
 
 function createChunks(text: string, filename: string, numPages: number): Document[] {
   const chunks: Document[] = [];
@@ -51,8 +36,9 @@ function createChunks(text: string, filename: string, numPages: number): Documen
         },
       }));
 
-      currentChunk = paragraph.slice(-chunkOverlap) + separator + paragraph;
-      currentChunkSize = paragraph.slice(-chunkOverlap).length + separator.length + paragraph.length;
+      const overlapText = paragraph.slice(-chunkOverlap);
+      currentChunk = overlapText + separator + paragraph;
+      currentChunkSize = overlapText.length + separator.length + paragraph.length;
     } else {
       currentChunk += paragraph;
       currentChunkSize += paragraph.length;
@@ -74,6 +60,8 @@ function createChunks(text: string, filename: string, numPages: number): Documen
 }
 
 export async function POST(request: NextRequest) {
+  let tempFilePath: string | null = null;
+
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
@@ -99,7 +87,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
     const documentId = uuidv4();
     const collectionName = `doc-${documentId}`;
 
@@ -107,18 +94,45 @@ export async function POST(request: NextRequest) {
     let numPages = 1;
 
     if (file.name.endsWith('.pdf')) {
+      // Write file to temp location for LangChain PDFLoader
+      const fs = await import('fs');
+      const os = await import('os');
+      const path = await import('path');
+
+      const tempDir = os.tmpdir();
+      tempFilePath = path.join(tempDir, `upload-${documentId}.pdf`);
+
+      const buffer = Buffer.from(await file.arrayBuffer());
+      fs.writeFileSync(tempFilePath, buffer);
+
       try {
-        const parsed = await parsePDF(buffer);
-        text = parsed.text;
-        numPages = parsed.numPages;
-      } catch (parseError) {
-        console.error('PDF parsing error:', parseError);
+        const loader = new PDFLoader(tempFilePath);
+        const docs = await loader.load();
+
+        if (docs.length === 0) {
+          throw new Error('No content extracted from PDF');
+        }
+
+        text = docs.map(d => d.pageContent).join('\n\n');
+        numPages = docs.length;
+
+        // Clean up temp file
+        fs.unlinkSync(tempFilePath);
+        tempFilePath = null;
+      } catch (pdfError) {
+        // Clean up temp file if it exists
+        if (tempFilePath && fs.existsSync(tempFilePath)) {
+          fs.unlinkSync(tempFilePath);
+        }
+        console.error('PDF parsing error:', pdfError);
         return NextResponse.json(
-          { success: false, message: 'Could not extract text from PDF. Please try a different file.' },
+          { success: false, message: `Could not extract text from PDF: ${pdfError instanceof Error ? pdfError.message : 'Unknown error'}` },
           { status: 400 }
         );
       }
     } else {
+      // Plain text file
+      const buffer = Buffer.from(await file.arrayBuffer());
       text = buffer.toString('utf-8');
     }
 
@@ -150,6 +164,16 @@ export async function POST(request: NextRequest) {
       message: `Successfully indexed ${chunks.length} chunks from ${numPages} pages`,
     });
   } catch (error) {
+    // Clean up temp file if it exists
+    if (tempFilePath) {
+      try {
+        const fs = await import('fs');
+        if (fs.existsSync(tempFilePath)) {
+          fs.unlinkSync(tempFilePath);
+        }
+      } catch {}
+    }
+
     console.error('Upload error:', error);
     return NextResponse.json(
       { success: false, message: `Failed to process document: ${error instanceof Error ? error.message : 'Unknown error'}` },
