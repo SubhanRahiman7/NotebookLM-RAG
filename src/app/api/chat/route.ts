@@ -22,7 +22,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log('Chat API called with:', { query, collectionName });
+
     const result = await generateAnswerStream(query, collectionName);
+
+    console.log('Result:', JSON.stringify(result, null, 2));
 
     return NextResponse.json({
       success: true,
