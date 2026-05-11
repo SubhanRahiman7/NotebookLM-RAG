@@ -1,9 +1,13 @@
-import type { Metadata } from 'next';
-import './globals.css';
+import "./globals.css";
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: 'NotebookLM RAG',
-  description: 'A RAG-powered document Q&A application',
+  title: "NotebookLM RAG",
+  description: "AI-powered document analysis with grounded answers",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -13,7 +17,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-gray-50">{children}</body>
+      <body className="min-h-screen bg-black text-white antialiased">
+        {children}
+      </body>
     </html>
   );
 }
