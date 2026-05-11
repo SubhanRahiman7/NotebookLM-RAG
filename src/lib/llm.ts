@@ -1,4 +1,5 @@
-import { similaritySearch, type Document } from './vectorStore';
+import { similaritySearch } from './vectorStore';
+import type { Document } from '@langchain/core/documents';
 
 export interface SourceChunk {
   content: string;
@@ -20,7 +21,7 @@ async function getAccessToken(): Promise<{ token: string; projectId: string }> {
 
   const projectId = process.env.GCP_PROJECT_ID;
   const clientEmail = process.env.GCP_CLIENT_EMAIL;
-  const privateKey = process.env.GCP_PRIVATE_KEY;
+  const privateKey = process.env.GCP_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error('Missing GCP credentials. Please set GCP_PROJECT_ID, GCP_CLIENT_EMAIL, and GCP_PRIVATE_KEY environment variables.');
