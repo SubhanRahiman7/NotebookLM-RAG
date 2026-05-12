@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, ReactNode } from 'react';
 import { SourceChunk } from '@/types';
 
 interface ChatMessage {
@@ -13,6 +13,52 @@ interface ChatMessage {
 interface ChatInterfaceProps {
   collectionName: string;
   documentFilename: string;
+}
+
+function parseFormattedText(text: string): ReactNode[] {
+  const elements: ReactNode[] = [];
+  const regex = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      elements.push(text.slice(lastIndex, match.index));
+    }
+
+    const matched = match[0];
+    if (matched.startsWith('**') && matched.endsWith('**')) {
+      elements.push(
+        <strong key={match.index} className="font-semibold text-white">
+          {matched.slice(2, -2)}
+        </strong>
+      );
+    } else if (matched.startsWith('*') && matched.endsWith('*')) {
+      elements.push(
+        <em key={match.index} className="italic text-white/70">
+          {matched.slice(1, -1)}
+        </em>
+      );
+    }
+
+    lastIndex = match.index + matched.length;
+  }
+
+  if (lastIndex < text.length) {
+    elements.push(text.slice(lastIndex));
+  }
+
+  return elements;
+}
+
+function formatMessage(text: string) {
+  const lines = text.split('\n');
+  return lines.map((line, idx) => (
+    <span key={idx}>
+      {parseFormattedText(line)}
+      {idx < lines.length - 1 && <br />}
+    </span>
+  ));
 }
 
 export default function ChatInterface({ collectionName, documentFilename }: ChatInterfaceProps) {
@@ -141,7 +187,7 @@ export default function ChatInterface({ collectionName, documentFilename }: Chat
                   : 'bg-white/5 text-white/80'
               }`}
             >
-              <p className="whitespace-pre-wrap leading-relaxed text-[14px]">{msg.content}</p>
+              <div className="whitespace-pre-wrap leading-relaxed text-[14px]">{formatMessage(msg.content)}</div>
 
               {msg.sources && msg.sources.length > 0 && (
                 <div className="mt-3">
@@ -168,7 +214,9 @@ export default function ChatInterface({ collectionName, documentFilename }: Chat
                               Page {source.pageNumber}
                             </span>
                           </div>
-                          <p className="text-white/50 line-clamp-3 leading-relaxed">{source.content}</p>
+                          <div className="text-white/50 leading-relaxed">
+                            <div className="whitespace-pre-wrap line-clamp-3">{formatMessage(source.content)}</div>
+                          </div>
                         </div>
                       ))}
                     </div>
