@@ -29,13 +29,13 @@ function parseFormattedText(text: string): ReactNode[] {
     const matched = match[0];
     if (matched.startsWith('**') && matched.endsWith('**')) {
       elements.push(
-        <strong key={match.index} className="font-semibold text-white">
+        <strong key={match.index} className="font-bold text-primary-300 bg-primary-500/10 px-1.5 py-0.5 rounded">
           {matched.slice(2, -2)}
         </strong>
       );
     } else if (matched.startsWith('*') && matched.endsWith('*')) {
       elements.push(
-        <em key={match.index} className="italic text-white/70">
+        <em key={match.index} className="italic text-amber-300">
           {matched.slice(1, -1)}
         </em>
       );
@@ -53,12 +53,16 @@ function parseFormattedText(text: string): ReactNode[] {
 
 function formatMessage(text: string) {
   const lines = text.split('\n');
-  return lines.map((line, idx) => (
-    <span key={idx}>
-      {parseFormattedText(line)}
-      {idx < lines.length - 1 && <br />}
-    </span>
-  ));
+  return (
+    <>
+      {lines.map((line, idx) => (
+        <span key={idx}>
+          {parseFormattedText(line)}
+          {idx < lines.length - 1 && <br />}
+        </span>
+      ))}
+    </>
+  );
 }
 
 export default function ChatInterface({ collectionName, documentFilename }: ChatInterfaceProps) {
@@ -181,13 +185,15 @@ export default function ChatInterface({ collectionName, documentFilename }: Chat
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
             <div
-              className={`max-w-[80%] rounded-2xl px-5 py-3.5 ${
+              className={`max-w-[80%] rounded-2xl px-5 py-4 ${
                 msg.role === 'user'
-                  ? 'bg-gradient-to-br from-primary-600 to-primary-500 text-white rounded-br-sm shadow-lg shadow-primary-500/10'
-                  : 'bg-white/5 text-white/80'
+                  ? 'bg-gradient-to-br from-primary-600 to-primary-500 text-white rounded-br-sm shadow-lg shadow-primary-500/20'
+                  : 'bg-gradient-to-br from-white/[0.08] to-white/[0.03] text-white/90 border border-white/10 backdrop-blur-sm'
               }`}
             >
-              <div className="whitespace-pre-wrap leading-relaxed text-[14px]">{formatMessage(msg.content)}</div>
+              <div className="whitespace-pre-wrap leading-relaxed text-[14px]">
+              {formatMessage(msg.content)}
+            </div>
 
               {msg.sources && msg.sources.length > 0 && (
                 <div className="mt-3">
